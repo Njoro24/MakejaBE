@@ -1,13 +1,11 @@
 import os
-from flask import Flask
+from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 
 # Import configuration
 from app.config import Config
 from app.db import init_db, create_tables
-
-
 
 # Import routes (only import what exists)
 try:
@@ -59,20 +57,17 @@ def create_app(config_name=None):
     if config_name is None:
         config_name = os.environ.get('FLASK_ENV', 'development')
     
-   
-    
-  
-    
     # Create Flask app
     app = Flask(__name__)
+    
+    # Enable CORS
+    CORS(app)
   
     # Initialize extensions
     init_db(app)
     
     # Setup JWT
     jwt = JWTManager(app)
-    
-   
     
     # Register blueprints (only register what exists)
     if auth_bp:
@@ -93,7 +88,7 @@ def create_app(config_name=None):
     
     if payment_bp:
         app.register_blueprint(payment_bp, url_prefix='/api/payments')
-        print("Payment routes registered")
+        print("Payment routes registered (includes M-Pesa)")
     
     if review_bp:
         app.register_blueprint(review_bp, url_prefix='/api/reviews')
@@ -120,7 +115,7 @@ def create_app(config_name=None):
                 'users': '/api/users',
                 'hostels': '/api/hostels',
                 'bookings': '/api/bookings',
-                'payments': '/api/payments',
+                'payments': '/api/payments (includes M-Pesa)',
                 'reviews': '/api/reviews',
                 'admin': '/api/admin',
                 'health': '/api/health'
@@ -156,6 +151,7 @@ Host: {host}
 Port: {port}
 Debug: {debug}
 URL: http://{host}:{port}/
+M-Pesa Routes: /api/payments/mpesa/*
     """)
     
     # Run the application
