@@ -16,3 +16,7 @@ class BookingResponseSchema(Schema):
     total_price = fields.Float()
     status = fields.Str()
     created_at = fields.DateTime()
+
+# Schema instances
+booking_schema = BookingCreateSchema()
+booking_response_schema = BookingResponseSchema()

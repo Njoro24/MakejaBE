@@ -11,8 +11,8 @@ class Booking(db.Model):
     check_out = db.Column(db.Date, nullable=False)
     guests = db.Column(db.Integer, nullable=False)
     total_price = db.Column(db.Float, nullable=False)
-    status = db.Column(db.String(20), default='pending')  # pending, paid, cancelled
+    status = db.Column(db.String(20), default='pending')  
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    user = db.relationship('User', backref='bookings')
-    room = db.relationship('Room', backref='bookings')
+    user = db.relationship('User', back_populates='bookings')
+    room = db.relationship('Room', back_populates='bookings')
