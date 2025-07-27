@@ -1,23 +1,27 @@
+from flask import Flask, jsonify
 import requests
 import base64
-from datetime import datetime
-import os
+
+app = Flask(__name__)
 
 class MpesaAuth:
     def __init__(self):
-        """Initialize M-Pesa authentication with consumer key and secret."""
+        # Replace with your actual credentials
         self.consumer_key = "Bl0yLyomUFlqQJv36ou12oxNLDVpRE38iPUYZ5dXZbGruDel"
         self.consumer_secret = "o3G6DSjlMnlWDbxKGe7EEAwRTwabldnpuaApcI4bPjcllbOUV3PMAhkEyCyAQrtm"
-        self.base_url = "https://sandbox.safaricom.co.ke"  # Sandbox URL
+        self.base_url = "https://sandbox.safaricom.co.ke"
         
-        # Sandbox credentials 
-        self.shortcode = "174379"  # Sandbox shortcode
-        self.passkey = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919"  # Sandbox passkey
+        # Sandbox test credentials
+        self.shortcode = "174379"
+        self.passkey = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919"
         
     def get_access_token(self):
         """Get OAuth access token from M-Pesa"""
         try:
-            # Create base64 encoded string of consumer key and secret
+            print(f"Consumer Key: {self.consumer_key[:10]}...")
+            print(f"Consumer Secret: {self.consumer_secret[:10]}...")
+            
+            # Create base64 encoded string
             key_secret = f"{self.consumer_key}:{self.consumer_secret}"
             encoded_credentials = base64.b64encode(key_secret.encode()).decode()
             
@@ -29,22 +33,26 @@ class MpesaAuth:
             
             # Make request
             url = f"{self.base_url}/oauth/v1/generate?grant_type=client_credentials"
+            print(f"Making request to: {url}")
             response = requests.get(url, headers=headers)
+            
+            print(f"Response Status: {response.status_code}")
+            print(f"Response Text: {response.text}")
             
             if response.status_code == 200:
                 token_data = response.json()
                 return token_data['access_token']
             else:
-                print(f"Error getting token: {response.text}")
                 return None
                 
         except Exception as e:
-            print(f"Exception getting token: {str(e)}")
+            print(f"Exception: {str(e)}")
             return None
     
     def generate_password(self):
         """Generate password for STK Push"""
-        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        import datetime
+        timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
         password_string = f"{self.shortcode}{self.passkey}{timestamp}"
         password = base64.b64encode(password_string.encode()).decode()
         return password, timestamp
@@ -60,47 +68,36 @@ class MpesaAuth:
             # Generate password and timestamp
             password, timestamp = self.generate_password()
             
-            # Format phone number (ensure it starts with 254)
-            if phone_number.startswith('0'):
-                phone_number = '254' + phone_number[1:]
-            elif phone_number.startswith('+254'):
-                phone_number = phone_number[1:]
-            elif not phone_number.startswith('254'):
-                phone_number = '254' + phone_number
-            
-            # Prepare request headers
+            # Prepare request
             headers = {
                 'Authorization': f'Bearer {access_token}',
                 'Content-Type': 'application/json'
             }
             
-            # Prepare request payload
             payload = {
                 "BusinessShortCode": self.shortcode,
                 "Password": password,
                 "Timestamp": timestamp,
                 "TransactionType": "CustomerPayBillOnline",
-                "Amount": int(amount),  
+                "Amount": amount,
                 "PartyA": phone_number,
                 "PartyB": self.shortcode,
                 "PhoneNumber": phone_number,
-                "CallBackURL": "https://yourdomain.com/callback",  # i will update this with the actual domain
+                "CallBackURL": "https://mydomain.com/callback",  # We'll update this later
                 "AccountReference": account_reference,
                 "TransactionDesc": transaction_desc
             }
             
-            # Make STK Push request
             url = f"{self.base_url}/mpesa/stkpush/v1/processrequest"
             response = requests.post(url, json=payload, headers=headers)
             
+            print(f"STK Push Response: {response.status_code}")
+            print(f"STK Push Text: {response.text}")
+            
             if response.status_code == 200:
-                response_data = response.json()
-                if response_data.get('ResponseCode') == '0':
-                    return {"success": True, "data": response_data}
-                else:
-                    return {"success": False, "message": response_data.get('errorMessage', 'STK Push failed')}
+                return {"success": True, "data": response.json()}
             else:
-                return {"success": False, "message": f"Request failed: {response.text}"}
+                return {"success": False, "message": response.text}
                 
         except Exception as e:
             print(f"STK Push Exception: {str(e)}")
@@ -117,13 +114,12 @@ class MpesaAuth:
             # Generate password and timestamp
             password, timestamp = self.generate_password()
             
-            # Prepare request headers
+            # Prepare request
             headers = {
                 'Authorization': f'Bearer {access_token}',
                 'Content-Type': 'application/json'
             }
             
-            # Prepare request payload
             payload = {
                 "BusinessShortCode": self.shortcode,
                 "Password": password,
@@ -131,31 +127,77 @@ class MpesaAuth:
                 "CheckoutRequestID": checkout_request_id
             }
             
-            # Make query request
             url = f"{self.base_url}/mpesa/stkpushquery/v1/query"
             response = requests.post(url, json=payload, headers=headers)
             
+            print(f"Query Response: {response.status_code}")
+            print(f"Query Text: {response.text}")
+            
             if response.status_code == 200:
-                response_data = response.json()
-                return {"success": True, "data": response_data}
+                return {"success": True, "data": response.json()}
             else:
-                return {"success": False, "message": f"Query failed: {response.text}"}
+                return {"success": False, "message": response.text}
                 
         except Exception as e:
             print(f"Query Exception: {str(e)}")
             return {"success": False, "message": str(e)}
+
+# Initialize M-Pesa
+mpesa = MpesaAuth()
+
+@app.route('/')
+def home():
+    return "M-Pesa Test API Running!"
+
+@app.route('/get-token', methods=['GET'])
+def get_token():
+    token = mpesa.get_access_token()
+    if token:
+        return jsonify({"success": True, "token": token})
+    else:
+        return jsonify({"success": False, "message": "Failed to get token"}), 400
+
+@app.route('/stk-push', methods=['POST'])
+def stk_push():
+    from flask import request
+    data = request.get_json()
     
-    def format_phone_number(self, phone_number):
-        """Format phone number to correct M-Pesa format (254XXXXXXXXX)"""
-        # Remove any spaces or special characters
-        phone_number = ''.join(filter(str.isdigit, phone_number))
-        
-        # Handle different formats
-        if phone_number.startswith('0'):
-            return '254' + phone_number[1:]
-        elif phone_number.startswith('254'):
-            return phone_number
-        elif len(phone_number) == 9:  
-            return '254' + phone_number
-        else:
-            return phone_number  
+    # Validate required fields
+    required_fields = ['phone', 'amount', 'account_reference', 'description']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({"success": False, "message": f"Missing {field}"}), 400
+    
+    # Initiate STK Push
+    result = mpesa.stk_push(
+        phone_number=data['phone'],
+        amount=data['amount'],
+        account_reference=data['account_reference'],
+        transaction_desc=data['description']
+    )
+    
+    if result['success']:
+        return jsonify(result)
+    else:
+        return jsonify(result), 400
+
+@app.route('/stk-query', methods=['POST'])
+def stk_query():
+    from flask import request
+    data = request.get_json()
+    
+    # Validate required fields
+    if 'checkout_request_id' not in data:
+        return jsonify({"success": False, "message": "Missing checkout_request_id"}), 400
+    
+    # Query payment status
+    result = mpesa.stk_query(data['checkout_request_id'])
+    
+    if result['success']:
+        return jsonify(result)
+    else:
+        return jsonify(result), 400
+
+if __name__ == '__main__':
+    print("Starting M-Pesa Test Server...")
+    app.run(debug=True, port=5001)
