@@ -16,7 +16,7 @@ def create_review():
     if errors:
         return jsonify({"error": errors}), 400
 
-    user_id = get_jwt_identity()  # Get user ID from token
+    user_id = get_jwt_identity()
 
     try:
         review_data = {
