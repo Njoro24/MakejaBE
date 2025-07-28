@@ -53,10 +53,10 @@ class Config:
     MAIL_SUPPRESS_SEND = False
     
     # M-Pesa configuration (for Kenya)
-    MPESA_CONSUMER_KEY = os.environ.get('MPESA_CONSUMER_KEY')
-    MPESA_CONSUMER_SECRET = os.environ.get('MPESA_CONSUMER_SECRET')
-    MPESA_SHORTCODE = os.environ.get('MPESA_SHORTCODE')
-    MPESA_PASSKEY = os.environ.get('MPESA_PASSKEY')
+    MPESA_CONSUMER_KEY = os.environ.get('Bl0yLyomUFlqQJv36ou12oxNLDVpRE38iPUYZ5dXZbGruDel')
+    MPESA_CONSUMER_SECRET = os.environ.get('o3G6DSjlMnlWDbxKGe7EEAwRTwabldnpuaApcI4bPjcllbOUV3PMAhkEyCyAQrtm')
+    MPESA_SHORTCODE = os.environ.get('174379')
+    MPESA_PASSKEY = os.environ.get('bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919') #sandbox
     MPESA_CALLBACK_URL = os.environ.get('MPESA_CALLBACK_URL')
     
     # Payment settings
