@@ -7,6 +7,8 @@ from flask_jwt_extended import JWTManager
 from app.config import Config
 from app.db import init_db, create_tables
 
+app = Flask(__name__)
+
 # Import routes (only import what exists)
 try:
     from app.routes.auth import auth_bp
