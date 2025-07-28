@@ -1,90 +1,124 @@
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
-from sqlalchemy.orm import Session
-from fastapi import HTTPException, status
-from passlib.context import CryptContext
-import jwt
+from flask import current_app
+from flask_jwt_extended import create_access_token, decode_token
 from jwt.exceptions import InvalidTokenError
+import re
 
-from ..database.models import User
-from ..database.session import get_db
-from ..utils.security import create_access_token, verify_token, get_password_hash, verify_password
-from ..utils.validators import validate_email, validate_password
-from ..config import settings
+from app.models.user import User, TokenBlacklist
+from app.db import db
+from app.services.email_service import EmailService
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class AuthService:
-    def __init__(self, db: Session):
-        self.db = db
-
-    def register_user(self, email: str, password: str, full_name: str) -> Dict[str, Any]:
+    """Service class for handling authentication operations."""
+    
+    @staticmethod
+    def validate_email(email: str) -> bool:
         """
-        Register a new user with email and password.
+        Validate email format.
+        
+        Args:
+            email: Email address to validate
+            
+        Returns:
+            bool: True if email is valid
+        """
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        return re.match(pattern, email) is not None
+    
+    @staticmethod
+    def validate_password(password: str) -> tuple:
+        """
+        Validate password strength.
+        
+        Args:
+            password: Password to validate
+            
+        Returns:
+            Tuple: (is_valid, error_message)
+        """
+        if len(password) < 6:
+            return False, "Password must be at least 6 characters long"
+        
+        return True, ""
+        
+    @staticmethod
+    def register_user(email: str, password: str, first_name: str, last_name: str, 
+                     phone_number: str = None) -> Dict[str, Any]:
+        """
+        Register a new user with email verification.
         
         Args:
             email: User's email address
             password: User's password (plain text)
-            full_name: User's full name
+            first_name: User's first name
+            last_name: User's last name
+            phone_number: User's phone number (optional)
             
         Returns:
-            Dict containing user info and access token
+            Dict containing user info and verification status
             
         Raises:
-            HTTPException: If validation fails or user already exists
+            ValueError: If validation fails or user already exists
         """
         # Validate input
-        if not validate_email(email):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid email format"
-            )
+        email = email.strip().lower()
+        if not AuthService.validate_email(email):
+            raise ValueError("Invalid email format")
         
-        if not validate_password(password):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number"
-            )
+        is_valid_password, password_error = AuthService.validate_password(password)
+        if not is_valid_password:
+            raise ValueError(password_error)
+        
+        if not first_name.strip() or not last_name.strip():
+            raise ValueError("First name and last name are required")
         
         # Check if user already exists
-        existing_user = self.db.query(User).filter(User.email == email.lower()).first()
+        existing_user = User.find_by_email(email)
         if existing_user:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="User with this email already exists"
+            raise ValueError("User with this email already exists")
+        
+        try:
+            # Create new user
+            user = User(
+                email=email,
+                first_name=first_name.strip(),
+                last_name=last_name.strip(),
+                phone_number=phone_number.strip() if phone_number else None
             )
-        
-        # Create new user
-        hashed_password = get_password_hash(password)
-        new_user = User(
-            email=email.lower(),
-            hashed_password=hashed_password,
-            full_name=full_name.strip(),
-            is_active=True
-        )
-        
-        self.db.add(new_user)
-        self.db.commit()
-        self.db.refresh(new_user)
-        
-        # Generate access token
-        access_token = create_access_token(
-            data={"sub": new_user.email, "user_id": new_user.id}
-        )
-        
-        return {
-            "user": {
-                "id": new_user.id,
-                "email": new_user.email,
-                "full_name": new_user.full_name,
-                "is_active": new_user.is_active,
-                "created_at": new_user.created_at
-            },
-            "access_token": access_token,
-            "token_type": "bearer"
-        }
-
-    def authenticate_user(self, email: str, password: str) -> Dict[str, Any]:
+            
+            # Set password using the model's method
+            user.set_password(password)
+            
+            # Generate verification token
+            verification_token = user.generate_verification_token()
+            
+            # Save user to database
+            user.save()
+            
+            # Send verification email
+            email_sent = EmailService.send_verification_email(
+                user_email=email,
+                user_name=user.full_name,
+                token=verification_token
+            )
+            
+            return {
+                "success": True,
+                "message": "Registration successful! Please check your email to verify your account.",
+                "user": user.serialize(),
+                "email_sent": email_sent,
+                "verification_required": True
+            }
+            
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Registration error: {str(e)}")
+            raise ValueError("Registration failed due to server error")
+    
+    @staticmethod
+    def authenticate_user(email: str, password: str) -> Dict[str, Any]:
         """
         Authenticate user with email and password.
         
@@ -96,149 +130,151 @@ class AuthService:
             Dict containing user info and access token
             
         Raises:
-            HTTPException: If authentication fails
+            ValueError: If authentication fails
         """
+        email = email.strip().lower()
+        
+        # Validate email format
+        if not AuthService.validate_email(email):
+            raise ValueError("Invalid email format")
+        
         # Find user by email
-        user = self.db.query(User).filter(User.email == email.lower()).first()
+        user = User.find_by_email(email)
         
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password"
-            )
-        
-        # Verify password
-        if not verify_password(password, user.hashed_password):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password"
-            )
+        if not user or not user.check_password(password):
+            raise ValueError("Invalid email or password")
         
         # Check if user is active
         if not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Account is deactivated"
-            )
+            raise ValueError("Account is deactivated")
         
-        # Update last login
-        user.last_login = datetime.utcnow()
-        self.db.commit()
+        # Check if email is verified
+        if not user.is_email_verified:
+            raise ValueError("Please verify your email before logging in")
         
-        # Generate access token
-        access_token = create_access_token(
-            data={"sub": user.email, "user_id": user.id}
-        )
-        
-        return {
-            "user": {
-                "id": user.id,
-                "email": user.email,
-                "full_name": user.full_name,
-                "is_active": user.is_active,
-                "last_login": user.last_login,
-                "created_at": user.created_at
-            },
-            "access_token": access_token,
-            "token_type": "bearer"
-        }
-
-    def get_current_user(self, token: str) -> User:
+        try:
+            # Update user's updated_at timestamp (last activity)
+            user.update(updated_at=datetime.utcnow())
+            
+            # Generate access token
+            access_token = create_access_token(identity=user.id)
+            
+            return {
+                "success": True,
+                "message": "Login successful",
+                "user": user.serialize(),
+                "access_token": access_token,
+                "token_type": "bearer"
+            }
+            
+        except Exception as e:
+            current_app.logger.error(f"Authentication error: {str(e)}")
+            raise ValueError("Authentication failed due to server error")
+    
+    @staticmethod
+    def verify_email(token: str) -> Dict[str, Any]:
         """
-        Get current user from JWT token.
+        Verify user's email address using verification token.
         
         Args:
-            token: JWT access token
+            token: Email verification token
             
         Returns:
-            User object
+            Dict containing verification result
             
         Raises:
-            HTTPException: If token is invalid or user not found
+            ValueError: If token is invalid or expired
         """
-        try:
-            payload = verify_token(token)
-            email: str = payload.get("sub")
-            user_id: int = payload.get("user_id")
-            
-            if email is None or user_id is None:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid token payload"
-                )
-                
-        except InvalidTokenError:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired token"
-            )
+        if not token:
+            raise ValueError("Verification token is required")
         
-        # Find user in database
-        user = self.db.query(User).filter(User.id == user_id).first()
+        # Find user with this token
+        user = User.find_by_verification_token(token)
+        
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found"
-            )
+            raise ValueError("Invalid verification token")
         
-        # Check if user is still active
-        if not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Account is deactivated"
-            )
+        # Check if token is valid and not expired
+        if not user.is_verification_token_valid(token):
+            raise ValueError("Verification token has expired")
         
-        return user
-
-    def refresh_token(self, token: str) -> Dict[str, Any]:
+        # Check if already verified
+        if user.is_email_verified:
+            return {
+                "success": True,
+                "message": "Email already verified",
+                "user": user.serialize()
+            }
+        
+        try:
+            # Verify the user
+            user.verify_email()
+            db.session.commit()
+            
+            return {
+                "success": True,
+                "message": "Email verified successfully! You can now log in.",
+                "user": user.serialize()
+            }
+            
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Email verification error: {str(e)}")
+            raise ValueError("Email verification failed due to server error")
+    
+    @staticmethod
+    def resend_verification_email(email: str) -> Dict[str, Any]:
         """
-        Refresh an access token.
+        Resend email verification token.
         
         Args:
-            token: Current JWT access token
+            email: User's email address
             
         Returns:
-            Dict containing new access token
+            Dict containing operation result
             
         Raises:
-            HTTPException: If token is invalid
+            ValueError: If user not found or already verified
         """
+        email = email.strip().lower()
+        
+        if not AuthService.validate_email(email):
+            raise ValueError("Invalid email format")
+        
+        user = User.find_by_email(email)
+        if not user:
+            raise ValueError("User not found")
+        
+        if user.is_email_verified:
+            raise ValueError("Email already verified")
+        
         try:
-            payload = verify_token(token, verify_expiration=False)  # Don't verify expiration for refresh
-            email: str = payload.get("sub")
-            user_id: int = payload.get("user_id")
+            # Generate new verification token
+            verification_token = user.generate_verification_token()
+            db.session.commit()
             
-            if email is None or user_id is None:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid token payload"
-                )
+            # Send verification email
+            email_sent = EmailService.send_verification_email(
+                user_email=email,
+                user_name=user.full_name,
+                token=verification_token
+            )
+            
+            if email_sent:
+                return {
+                    "success": True,
+                    "message": "Verification email sent successfully!"
+                }
+            else:
+                raise ValueError("Failed to send verification email")
                 
-        except InvalidTokenError:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token"
-            )
-        
-        # Verify user still exists and is active
-        user = self.db.query(User).filter(User.id == user_id).first()
-        if not user or not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found or inactive"
-            )
-        
-        # Generate new access token
-        new_token = create_access_token(
-            data={"sub": user.email, "user_id": user.id}
-        )
-        
-        return {
-            "access_token": new_token,
-            "token_type": "bearer"
-        }
-
-    def change_password(self, user_id: int, current_password: str, new_password: str) -> Dict[str, str]:
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Resend verification error: {str(e)}")
+            raise ValueError("Failed to resend verification email")
+    
+    @staticmethod
+    def change_password(user_id: int, current_password: str, new_password: str) -> Dict[str, Any]:
         """
         Change user's password.
         
@@ -251,90 +287,39 @@ class AuthService:
             Dict with success message
             
         Raises:
-            HTTPException: If current password is wrong or new password is invalid
+            ValueError: If current password is wrong or new password is invalid
         """
         # Get user
-        user = self.db.query(User).filter(User.id == user_id).first()
+        user = User.find_by_id(user_id)
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
+            raise ValueError("User not found")
         
         # Verify current password
-        if not verify_password(current_password, user.hashed_password):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Current password is incorrect"
-            )
+        if not user.check_password(current_password):
+            raise ValueError("Current password is incorrect")
         
         # Validate new password
-        if not validate_password(new_password):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="New password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number"
-            )
+        is_valid_password, password_error = AuthService.validate_password(new_password)
+        if not is_valid_password:
+            raise ValueError(password_error)
         
-        # Update password
-        user.hashed_password = get_password_hash(new_password)
-        user.updated_at = datetime.utcnow()
-        self.db.commit()
-        
-        return {"message": "Password changed successfully"}
-
-    def deactivate_user(self, user_id: int) -> Dict[str, str]:
-        """
-        Deactivate a user account.
-        
-        Args:
-            user_id: User's ID
+        try:
+            # Update password
+            user.set_password(new_password)
+            user.update(updated_at=datetime.utcnow())
             
-        Returns:
-            Dict with success message
+            return {
+                "success": True,
+                "message": "Password changed successfully"
+            }
             
-        Raises:
-            HTTPException: If user not found
-        """
-        user = self.db.query(User).filter(User.id == user_id).first()
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
-        
-        user.is_active = False
-        user.updated_at = datetime.utcnow()
-        self.db.commit()
-        
-        return {"message": "User account deactivated successfully"}
-
-    def activate_user(self, user_id: int) -> Dict[str, str]:
-        """
-        Activate a user account.
-        
-        Args:
-            user_id: User's ID
-            
-        Returns:
-            Dict with success message
-            
-        Raises:
-            HTTPException: If user not found
-        """
-        user = self.db.query(User).filter(User.id == user_id).first()
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
-        
-        user.is_active = True
-        user.updated_at = datetime.utcnow()
-        self.db.commit()
-        
-        return {"message": "User account activated successfully"}
-
-    def reset_password_request(self, email: str) -> Dict[str, str]:
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Change password error: {str(e)}")
+            raise ValueError("Failed to change password")
+    
+    @staticmethod
+    def request_password_reset(email: str) -> Dict[str, Any]:
         """
         Generate password reset token for user.
         
@@ -342,30 +327,47 @@ class AuthService:
             email: User's email address
             
         Returns:
-            Dict with reset token (in production, this would be sent via email)
-            
-        Raises:
-            HTTPException: If user not found
+            Dict with operation result
         """
-        user = self.db.query(User).filter(User.email == email.lower()).first()
+        email = email.strip().lower()
+        
+        if not AuthService.validate_email(email):
+            raise ValueError("Invalid email format")
+        
+        user = User.find_by_email(email)
         if not user:
             # Don't reveal if email exists for security
-            return {"message": "If the email exists, a reset link has been sent"}
+            return {
+                "success": True,
+                "message": "If the email exists, a reset link has been sent"
+            }
         
-        # Generate password reset token (expires in 1 hour)
-        reset_token = create_access_token(
-            data={"sub": user.email, "user_id": user.id, "type": "password_reset"},
-            expires_delta=timedelta(hours=1)
-        )
-        
-        # In production, you would send this token via email
-        # For now, we'll return it in the response
-        return {
-            "message": "Password reset token generated",
-            "reset_token": reset_token  # Remove this in production
-        }
-
-    def reset_password(self, token: str, new_password: str) -> Dict[str, str]:
+        try:
+            # Generate password reset token
+            reset_token = user.generate_reset_token()
+            db.session.commit()
+            
+            # Send password reset email
+            reset_url = f"{current_app.config['FRONTEND_URL']}/reset-password?token={reset_token}"
+            email_sent = EmailService.send_password_reset_email(
+                user_email=email,
+                user_name=user.full_name,
+                reset_url=reset_url
+            )
+            
+            return {
+                "success": True,
+                "message": "If the email exists, a reset link has been sent",
+                "email_sent": email_sent
+            }
+            
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Password reset request error: {str(e)}")
+            raise ValueError("Failed to process password reset request")
+    
+    @staticmethod
+    def reset_password(token: str, new_password: str) -> Dict[str, Any]:
         """
         Reset user's password using reset token.
         
@@ -377,59 +379,142 @@ class AuthService:
             Dict with success message
             
         Raises:
-            HTTPException: If token is invalid or password is weak
+            ValueError: If token is invalid or password is weak
         """
-        try:
-            payload = verify_token(token)
-            email: str = payload.get("sub")
-            user_id: int = payload.get("user_id")
-            token_type: str = payload.get("type")
-            
-            if email is None or user_id is None or token_type != "password_reset":
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid reset token"
-                )
-                
-        except InvalidTokenError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or expired reset token"
-            )
+        if not token:
+            raise ValueError("Reset token is required")
         
-        # Find user
-        user = self.db.query(User).filter(User.id == user_id).first()
+        # Find user with this token
+        user = User.find_by_reset_token(token)
+        
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
+            raise ValueError("Invalid reset token")
+        
+        # Check if token is still valid
+        if not user.is_reset_token_valid():
+            raise ValueError("Reset token has expired")
         
         # Validate new password
-        if not validate_password(new_password):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number"
-            )
+        is_valid_password, password_error = AuthService.validate_password(new_password)
+        if not is_valid_password:
+            raise ValueError(password_error)
         
-        # Update password
-        user.hashed_password = get_password_hash(new_password)
-        user.updated_at = datetime.utcnow()
-        self.db.commit()
-        
-        return {"message": "Password reset successfully"}
-
-
-def get_auth_service(db: Session = None) -> AuthService:
-    """
-    Dependency to get AuthService instance.
+        try:
+            # Update password and clear reset token
+            user.set_password(new_password)
+            user.clear_reset_token()
+            user.update(updated_at=datetime.utcnow())
+            
+            return {
+                "success": True,
+                "message": "Password reset successfully"
+            }
+            
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Password reset error: {str(e)}")
+            raise ValueError("Failed to reset password")
     
-    Args:
-        db: Database session
+    @staticmethod
+    def logout_user(token: str) -> Dict[str, Any]:
+        """
+        Logout user by blacklisting their token.
         
-    Returns:
-        AuthService instance
-    """
-    if db is None:
-        db = next(get_db())
-    return AuthService(db)
+        Args:
+            token: JWT access token
+            
+        Returns:
+            Dict with success message
+        """
+        try:
+            # Decode token to get expiration time
+            decoded_token = decode_token(token)
+            jti = decoded_token['jti']
+            expires_at = datetime.fromtimestamp(decoded_token['exp'])
+            
+            # Add token to blacklist
+            TokenBlacklist.blacklist_token(jti, expires_at)
+            
+            return {
+                "success": True,
+                "message": "Logged out successfully"
+            }
+            
+        except Exception as e:
+            current_app.logger.error(f"Logout error: {str(e)}")
+            raise ValueError("Failed to logout")
+    
+    @staticmethod
+    def get_user_by_id(user_id: int) -> Optional[User]:
+        """
+        Get user by ID.
+        
+        Args:
+            user_id: User's ID
+            
+        Returns:
+            User object or None if not found
+        """
+        return User.find_by_id(user_id)
+    
+    @staticmethod
+    def deactivate_user(user_id: int) -> Dict[str, Any]:
+        """
+        Deactivate a user account.
+        
+        Args:
+            user_id: User's ID
+            
+        Returns:
+            Dict with success message
+            
+        Raises:
+            ValueError: If user not found
+        """
+        user = User.find_by_id(user_id)
+        if not user:
+            raise ValueError("User not found")
+        
+        try:
+            user.update(is_active=False, updated_at=datetime.utcnow())
+            
+            return {
+                "success": True,
+                "message": "User account deactivated successfully"
+            }
+            
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Deactivate user error: {str(e)}")
+            raise ValueError("Failed to deactivate user")
+    
+    @staticmethod
+    def activate_user(user_id: int) -> Dict[str, Any]:
+        """
+        Activate a user account.
+        
+        Args:
+            user_id: User's ID
+            
+        Returns:
+            Dict with success message
+            
+        Raises:
+            ValueError: If user not found
+        """
+        user = User.find_by_id(user_id)
+        if not user:
+            raise ValueError("User not found")
+        
+        try:
+            user.update(is_active=True, updated_at=datetime.utcnow())
+            
+            return {
+                "success": True,
+                "message": "User account activated successfully"
+            }
+            
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Activate user error: {str(e)}")
+            raise ValueError("Failed to activate user")

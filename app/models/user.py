@@ -14,13 +14,23 @@ class User(db.Model):
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=False)
     phone_number = db.Column(db.String(20), nullable=True)
-    profile_picture = db.Column(db.String(500), nullable=True)
-    is_active = db.Column(db.Boolean, default=True)
-    is_verified = db.Column(db.Boolean, default=False)
+    profile_picture = db.Column(db.Text, nullable=True)  # Changed to Text for longer URLs
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_verified = db.Column(db.Boolean, default=False, nullable=False)
     reset_token = db.Column(db.String(100), nullable=True)
     reset_token_expires = db.Column(db.DateTime, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    is_email_verified = db.Column(db.Boolean, default=False, nullable=False)
+    email_verification_token = db.Column(db.String(100), nullable=True)
+    email_verification_expires = db.Column(db.DateTime, nullable=True)
+
+    # PostgreSQL specific indexes for better performance
+    __table_args__ = (
+        db.Index('idx_user_email_active', 'email', 'is_active'),
+        db.Index('idx_user_verification_token', 'email_verification_token'),
+        db.Index('idx_user_reset_token', 'reset_token'),
+    )
 
     def set_password(self, password):
         """Hash and set password using Flask-Bcrypt"""
@@ -47,6 +57,27 @@ class User(db.Model):
             return False
         return datetime.utcnow() < self.reset_token_expires
     
+    def generate_verification_token(self):
+        """Generate email verification token"""
+        self.email_verification_token = str(uuid.uuid4())
+        self.email_verification_expires = datetime.utcnow() + timedelta(hours=24)
+        return self.email_verification_token
+    
+    def is_verification_token_valid(self, token):
+        """Check if email verification token is valid"""
+        if not self.email_verification_token or not self.email_verification_expires:
+            return False
+        if self.email_verification_token != token:
+            return False
+        return datetime.utcnow() < self.email_verification_expires
+    
+    def verify_email(self):
+        """Mark email as verified and clear verification token"""
+        self.is_email_verified = True
+        self.email_verification_token = None
+        self.email_verification_expires = None
+        self.updated_at = datetime.utcnow()
+    
     @property
     def full_name(self):
         """Get user's full name"""
@@ -63,6 +94,7 @@ class User(db.Model):
             'profile_picture': self.profile_picture,
             'is_active': self.is_active,
             'is_verified': self.is_verified,
+            'is_email_verified': self.is_email_verified,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'full_name': self.full_name
@@ -109,6 +141,11 @@ class User(db.Model):
         """Find user by reset token"""
         return cls.query.filter_by(reset_token=token).first()
     
+    @classmethod
+    def find_by_verification_token(cls, token):
+        """Find user by email verification token"""
+        return cls.query.filter_by(email_verification_token=token).first()
+    
     def __repr__(self):
         return f"<User {self.email}>"
 
@@ -118,8 +155,14 @@ class TokenBlacklist(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     token_jti = db.Column(db.String(36), unique=True, nullable=False, index=True)
-    blacklisted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    blacklisted_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False)
+    
+    # PostgreSQL specific indexes
+    __table_args__ = (
+        db.Index('idx_token_blacklist_jti', 'token_jti'),
+        db.Index('idx_token_blacklist_expires', 'expires_at'),
+    )
     
     def save(self):
         """Save token to blacklist"""
@@ -137,6 +180,15 @@ class TokenBlacklist(db.Model):
         """Add token to blacklist"""
         blacklisted_token = cls(token_jti=jti, expires_at=expires_at)
         blacklisted_token.save()
+    
+    @classmethod
+    def cleanup_expired_tokens(cls):
+        """Remove expired tokens from blacklist (for maintenance)"""
+        expired_tokens = cls.query.filter(cls.expires_at < datetime.utcnow()).all()
+        for token in expired_tokens:
+            db.session.delete(token)
+        db.session.commit()
+        return len(expired_tokens)
     
     def __repr__(self):
         return f"<TokenBlacklist {self.token_jti}>"

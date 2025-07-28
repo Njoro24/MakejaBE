@@ -7,11 +7,12 @@ migrate = Migrate()
 jwt = JWTManager()  
 
 def init_db(app):
+    """Initialize database with app"""
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)  
 
-    
+    # Load models (optional - helps with imports)
     try:
         from app.models.user import User
         print("User model loaded")
@@ -43,3 +44,13 @@ def init_db(app):
         print("Review model not found")
 
     return db
+
+def create_tables(app=None):
+    """Create all database tables"""
+    if app:
+        with app.app_context():
+            db.create_all()
+            print("Database tables created successfully")
+    else:
+        db.create_all()
+        print("Database tables created successfully")

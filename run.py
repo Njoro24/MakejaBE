@@ -2,55 +2,11 @@ import os
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
+from flask_mail import Mail
 
-# Import configuration
-from app.config import Config
-from app.db import init_db, create_tables
-
-app = Flask(__name__)
-
-# Import routes (only import what exists)
-try:
-    from app.routes.auth import auth_bp
-except ImportError:
-    auth_bp = None
-    print("auth.py not found or has import errors")
-
-try:
-    from app.routes.user import user_bp
-except ImportError:
-    user_bp = None
-    print("user.py route not found")
-
-try:
-    from app.routes.hostel import hostel_bp
-except ImportError:
-    hostel_bp = None
-    print("hostel.py route not found")
-
-try:
-    from app.routes.booking import booking_bp
-except ImportError:
-    booking_bp = None
-    print("booking.py route not found")
-
-try:
-    from app.routes.payment import payment_bp
-except ImportError:
-    payment_bp = None
-    print("payment.py route not found")
-
-try:
-    from app.routes.review import review_bp
-except ImportError:
-    review_bp = None
-    print("review.py route not found")
-
-try:
-    from app.routes.admin import admin_bp
-except ImportError:
-    admin_bp = None
-    print("admin.py route not found")
+# Import configuration and database
+from app.config import config
+from app.db import init_db, db
 
 def create_app(config_name=None):
     """Application factory pattern"""
@@ -62,14 +18,64 @@ def create_app(config_name=None):
     # Create Flask app
     app = Flask(__name__)
     
+    # Load configuration
+    app.config.from_object(config[config_name])
+    
     # Enable CORS
     CORS(app)
   
     # Initialize extensions
     init_db(app)
     
+    # Initialize mail
+    mail = Mail()
+    mail.init_app(app)
+    
     # Setup JWT
     jwt = JWTManager(app)
+
+    # Import routes (only import what exists)
+    try:
+        from app.routes.auth import auth_bp
+    except ImportError:
+        auth_bp = None
+        print("auth.py not found or has import errors")
+
+    try:
+        from app.routes.user import user_bp
+    except ImportError:
+        user_bp = None
+        print("user.py route not found")
+
+    try:
+        from app.routes.hostel import hostel_bp
+    except ImportError:
+        hostel_bp = None
+        print("hostel.py route not found")
+
+    try:
+        from app.routes.booking import booking_bp
+    except ImportError:
+        booking_bp = None
+        print("booking.py route not found")
+
+    try:
+        from app.routes.payment import payment_bp
+    except ImportError:
+        payment_bp = None
+        print("payment.py route not found")
+
+    try:
+        from app.routes.review import review_bp
+    except ImportError:
+        review_bp = None
+        print("review.py route not found")
+
+    try:
+        from app.routes.admin import admin_bp
+    except ImportError:
+        admin_bp = None
+        print("admin.py route not found")
     
     # Register blueprints (only register what exists)
     if auth_bp:
@@ -127,10 +133,10 @@ def create_app(config_name=None):
     # Create tables if they don't exist
     with app.app_context():
         try:
-            create_tables(app)
+            db.create_all()  # This creates all tables
             print(f"Database tables created/verified for {config_name} environment")
         except Exception as e:
-            print(f"Database initialization skipped: {str(e)}")
+            print(f"Database initialization error: {str(e)}")
     
     return app
 
@@ -165,9 +171,11 @@ M-Pesa Routes: /api/payments/mpesa/*
             threaded=True
         )
     except KeyboardInterrupt:
-        print("\n🛑 Server stopped by user")
+        print("Server stopped by user")
     except Exception as e:
-        print(f"❌ Server error: {str(e)}")
+        print(f"Server error: {str(e)}")
 
 if __name__ == '__main__':
+    # Create and run the app
+    app = create_app()
     app.run(debug=True, host='0.0.0.0', port=5000)

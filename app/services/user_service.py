@@ -4,9 +4,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from fastapi import HTTPException, status
 
-from ..database.models import User
+from app.db import User
 from ..utils.validators import validate_email
 from ..utils.security import get_password_hash
+from datetime import timedelta
 
 
 class UserService:
