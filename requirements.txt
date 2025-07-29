@@ -25,6 +25,7 @@ marshmallow==3.22.0
 marshmallow-sqlalchemy==1.1.1
 packaging==25.0
 pillow==10.4.0
+psycopg2-binary==2.9.10
 PyJWT==2.9.0
 python-dotenv==1.0.1
 requests==2.32.4

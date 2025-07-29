@@ -11,7 +11,10 @@ class Hostel(db.Model):
     location = db.Column(db.String(255), nullable=False)
     price_per_night = db.Column(db.Float, nullable=False)
     description = db.Column(db.Text)
-    amenities = db.Column(db.ARRAY(db.String))
+
+    # Use TEXT instead of ARRAY for broader DB support like SQLite
+    amenities = db.Column(db.Text)  # Store comma-separated amenities if needed
+
     image_url = db.Column(db.String)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
