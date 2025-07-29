@@ -31,14 +31,14 @@ marshmallow-sqlalchemy = "==1.1.1"
 packaging = "==25.0"
 pillow = "==10.4.0"
 pyjwt = "==2.9.0"
-python-dotenv = "==1.0.1"
 sqlalchemy = "==2.0.41"
 typing-extensions = "==4.13.2"
 urllib3 = "==2.2.3"
 werkzeug = "==3.0.6"
 zipp = "==3.20.2"
-flask = "*"
 requests = "*"
+python-dotenv = "*"
+flask = "*"
 
 [dev-packages]
 

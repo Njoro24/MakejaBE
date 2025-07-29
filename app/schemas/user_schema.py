@@ -1,6 +1,6 @@
 from marshmallow import Schema, fields, validate, validates, ValidationError, post_load
 from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
-from models.user import User
+from app.models.user import User
 import re
 
 class UserRegistrationSchema(Schema):

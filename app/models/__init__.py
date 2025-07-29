@@ -1,3 +1,7 @@
-from app.models.review import Review
+from .room import Room
+from .user import User
+from .booking import Booking
+from .review import Review
+#from .hostel import Hostel
 
-__all__ = ['Review']
+__all__ = ["Room", "User", "Booking", "Review", "Hostel"]
