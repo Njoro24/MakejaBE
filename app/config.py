@@ -15,11 +15,10 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key'
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'jwt-secret-key'
     
-    # Database - PostgreSQL for production, SQLite for development
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'postgresql://makeja_user:makeja_pass@localhost/makeja_db'
+   # Database - PostgreSQL for production, overridden in subclasses if needed
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'postgresql://makeja_user:makeja_pass@localhost/makeja_db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    
+
     # Email settings
     MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
     MAIL_PORT = int(os.environ.get('MAIL_PORT', 587))
