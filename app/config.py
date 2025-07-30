@@ -38,8 +38,8 @@ class Config:
 class DevelopmentConfig(Config):
     """Development configuration"""
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DEV_DATABASE_URL') or \
-        'sqlite:///makeja_dev.db'
+    SQLALCHEMY_DATABASE_URI = 'postgresql://makeja_user:makeja_pass@localhost/makeja_db'
+
 
 class ProductionConfig(Config):
     """Production configuration"""
