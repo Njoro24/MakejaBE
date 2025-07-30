@@ -55,6 +55,17 @@ def login():
         email = data.get('email', '').strip()
         password = data.get('password', '')
         
+        print(f"Login attempt - Email: {email}")  # DEBUG
+        
+        # Check if user exists and their status
+        from app.models.user import User
+        user = User.find_by_email(email.lower())
+        if user:
+            print(f"User found - Email verified: {user.is_email_verified}, Active: {user.is_active}")  # DEBUG
+            print(f"Password check: {user.check_password(password)}")  # DEBUG
+        else:
+            print("User not found")  # DEBUG
+        
         if not email or not password:
             return jsonify({'error': 'Email and password are required'}), 400
         
@@ -64,21 +75,8 @@ def login():
         return jsonify(result), 200
         
     except ValueError as e:
-        error_message = str(e)
-        
-        # Handle specific error cases
-        if "verify your email" in error_message:
-            return jsonify({
-                'error': error_message,
-                'email_not_verified': True,
-                'user_email': email
-            }), 401
-        
-        return jsonify({'error': error_message}), 401
-    except Exception as e:
-        current_app.logger.error(f"Login error: {str(e)}")
-        return jsonify({'error': 'Login failed due to server error'}), 500
-
+        print(f"Auth error: {str(e)}")  # DEBUG
+        return jsonify({'error': str(e)}), 401
 @auth_bp.route('/verify-email', methods=['GET'])
 def verify_email():
     """Verify user's email address"""
@@ -282,3 +280,5 @@ def test():
         'service': 'AuthService integration active',
         'timestamp': datetime.utcnow().isoformat()
     }), 200
+
+

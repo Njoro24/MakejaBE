@@ -6,13 +6,14 @@ db = SQLAlchemy()
 migrate = Migrate()
 jwt = JWTManager()  
 
+
 def init_db(app):
     """Initialize database with app"""
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)  
 
-    # Load models (optional - helps with imports)
+   
     try:
         from app.models.user import User
         print("User model loaded")
