@@ -1,6 +1,5 @@
 from flask import current_app
-from flask_mail import Message
-from app import mail
+from flask_mail import Message, Mail
 import os
 
 class EmailService:
@@ -10,6 +9,9 @@ class EmailService:
         try:
             frontend_url = current_app.config['FRONTEND_URL']
             verification_url = f"{frontend_url}/verify-email?token={token}"
+            
+            # Get mail instance from current_app
+            mail = current_app.extensions['mail']
             
             msg = Message(
                 subject='Verify Your Email - Makeja Hostel App',
@@ -69,6 +71,9 @@ class EmailService:
     def send_password_reset_email(user_email, user_name, reset_url):
         """Send password reset email (bonus feature)"""
         try:
+            # Get mail instance from current_app
+            mail = current_app.extensions['mail']
+            
             msg = Message(
                 subject='Reset Your Password - Makeja',
                 recipients=[user_email],

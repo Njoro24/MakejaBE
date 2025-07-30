@@ -63,3 +63,6 @@ config = {
     'testing': TestingConfig,
     'default': DevelopmentConfig
 }
+
+
+SKIP_EMAIL_VERIFICATION = os.getenv('SKIP_EMAIL_VERIFICATION', 'False').lower() == 'true'

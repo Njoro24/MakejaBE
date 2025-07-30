@@ -55,7 +55,7 @@ def login():
         email = data.get('email', '').strip()
         password = data.get('password', '')
         
-        print(f"Login attempt - Email: {email}")  # DEBUG
+        print(f"Login attempt - Email: {email}")
         
         # Check if user exists and their status
         from app.models.user import User
@@ -64,7 +64,7 @@ def login():
             print(f"User found - Email verified: {user.is_email_verified}, Active: {user.is_active}")  # DEBUG
             print(f"Password check: {user.check_password(password)}")  # DEBUG
         else:
-            print("User not found")  # DEBUG
+            print("User not found") 
         
         if not email or not password:
             return jsonify({'error': 'Email and password are required'}), 400
@@ -75,7 +75,7 @@ def login():
         return jsonify(result), 200
         
     except ValueError as e:
-        print(f"Auth error: {str(e)}")  # DEBUG
+        print(f"Auth error: {str(e)}")
         return jsonify({'error': str(e)}), 401
 @auth_bp.route('/verify-email', methods=['GET'])
 def verify_email():

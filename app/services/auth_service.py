@@ -45,7 +45,7 @@ class AuthService:
         
     @staticmethod
     def register_user(email: str, password: str, first_name: str, last_name: str, 
-                     phone_number: str = None) -> Dict[str, Any]:
+    phone_number: str = None) -> Dict[str, Any]:
         """
         Register a new user with email verification.
         
@@ -97,21 +97,47 @@ class AuthService:
             # Save user to database
             user.save()
             
+            current_app.logger.info(f"User created successfully: {email}")
+            
             # Send verification email
-            email_sent = EmailService.send_verification_email(
-                user_email=email,
-                user_name=user.full_name,
-                token=verification_token
-            )
-            
-            return {
-                "success": True,
-                "message": "Registration successful! Please check your email to verify your account.",
-                "user": user.serialize(),
-                "email_sent": email_sent,
-                "verification_required": True
-            }
-            
+            try:
+                email_sent = EmailService.send_verification_email(
+                    user_email=email,
+                    user_name=user.full_name,
+                    token=verification_token
+                )
+                
+                if not email_sent:
+                    current_app.logger.warning(f"User created but email failed to send for: {email}")
+                    # User created but email failed - return partial success
+                    return {
+                        "success": True,
+                        "message": "Account created successfully, but verification email could not be sent. You can request a new verification email.",
+                        "user": user.serialize(),
+                        "email_sent": False,
+                        "verification_required": True
+                    }
+                
+                current_app.logger.info(f"User registered and verification email sent: {email}")
+                
+                return {
+                    "success": True,
+                    "message": "Registration successful! Please check your email to verify your account.",
+                    "user": user.serialize(),
+                    "email_sent": True,
+                    "verification_required": True
+                }
+            except Exception as email_error:
+                current_app.logger.error(f"Email service error for {email}: {str(email_error)}")
+                # User was created but email failed
+                return {
+                    "success": True,
+                    "message": "Account created successfully, but verification email could not be sent. You can request a new verification email.",
+                    "user": user.serialize(),
+                    "email_sent": False,
+                    "verification_required": True
+                }
+        
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Registration error: {str(e)}")
@@ -145,24 +171,29 @@ class AuthService:
             raise ValueError("Invalid email or password")
         
         # Check if user is active
-        if not user.is_active:
-            raise ValueError("Account is deactivated")
+        # if not user.is_active:
+           #raise ValueError("Account is deactivated")
         
         # Check if email is verified
-        if not user.is_email_verified:
-            raise ValueError("Please verify your email before logging in")
+        # if not user.is_email_verified:
+            #raise ValueError("Please verify your email before logging in")
         
         try:
             # Update user's updated_at timestamp (last activity)
             user.update(updated_at=datetime.utcnow())
             
-            # Generate access token
-            access_token = create_access_token(identity=user.id)
+           
+          
+            # Generate access token with admin claim
+            additional_claims = {"is_admin": user.is_admin}
+            access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
+            
             
             return {
                 "success": True,
                 "message": "Login successful",
                 "user": user.serialize(),
+                "is_admin": user.is_admin,
                 "access_token": access_token,
                 "token_type": "bearer"
             }

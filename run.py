@@ -3,6 +3,8 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_mail import Mail
+from app.routes.admin import admin_bp
+import app.models
 
 # Import configuration and database
 from app.config import config
