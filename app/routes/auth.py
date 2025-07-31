@@ -61,23 +61,33 @@ def login():
         from app.models.user import User
         user = User.find_by_email(email.lower())
         if user:
-            print(f"User found - Email verified: {user.is_email_verified}, Active: {user.is_active}")  # DEBUG
-            print(f"Password check: {user.check_password(password)}")  # DEBUG
+            print(f"User found - Email verified: {user.is_email_verified}, Active: {user.is_active}")
+            print(f"Password check: {user.check_password(password)}")
         else:
             print("User not found") 
         
         if not email or not password:
             return jsonify({'error': 'Email and password are required'}), 400
         
+        print("About to call AuthService.authenticate_user...")  # Add this
+        
         # Use AuthService to authenticate user
         result = AuthService.authenticate_user(email=email, password=password)
+        
+        print(f"AuthService result: {result}")  # Add this
         
         return jsonify(result), 200
         
     except ValueError as e:
-        print(f"Auth error: {str(e)}")
+        print(f"Auth ValueError: {str(e)}")
         return jsonify({'error': str(e)}), 401
-
+    except Exception as e:
+        # ADD THIS MISSING EXCEPTION HANDLER:
+        print(f"🚨 LOGIN ERROR: {str(e)}")
+        print(f"Error type: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"message": "An unexpected error occurred", "status": "error"}), 500
 @auth_bp.route('/verify', methods=['GET'])
 @jwt_required()
 def verify_token():
