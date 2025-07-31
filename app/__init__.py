@@ -10,20 +10,26 @@ from flask_cors import CORS
 def create_app(config_name=None):
     app = Flask(__name__)
     app.config.from_object(Config)
-    CORS(app, origins=["https://makeja-csu3.vercel.app"])
 
+    #Enable CORS for your Vercel domain
+    CORS(
+        app,
+        origins=["https://makeja-csu3.vercel.app"],
+        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization"]
+    )
 
-    init_cors(app)
+    #Initialize other middleware
+    init_cors(app)  # Only keep this if it does NOT override Flask-CORS
     init_rate_limiter(app)
     register_error_handlers(app)
     
-    # Add these missing parts:
+    # ✅ Initialize database & JWT
     init_db(app)
     jwt = JWTManager(app)
     
-    # Register your blueprints here
+    #Register auth blueprint
     from .routes.auth import auth_bp
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     
-
     return app
