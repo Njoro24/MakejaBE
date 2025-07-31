@@ -176,8 +176,8 @@ class TokenBlacklist(db.Model):
     def __repr__(self):
         return f"<TokenBlacklist {self.token_jti}>"
 
-# Late-binding relationships (no circular import issues)
-from app.models.room import Room
-from app.models.booking import Booking
-User.rooms = db.relationship('Room', back_populates='host', lazy=True)
-User.bookings = db.relationship('Booking', back_populates='user', lazy=True)
+
+# from app.models.room import Room
+# from app.models.booking import Booking
+# User.rooms = db.relationship('Room', back_populates='host', lazy=True)
+# User.bookings = db.relationship('Booking', back_populates='user', lazy=True)

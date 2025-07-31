@@ -10,7 +10,7 @@ class Config:
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'jwt-secret-key'
     
     # CORS settings
-    ALLOWED_ORIGINS = ['http://localhost:5173']
+    ALLOWED_ORIGINS = ['https://makeja-csu3.vercel.app']
     CORS_SUPPORTS_CREDENTIALS = True
     
     # Database - PostgreSQL for production, overridden in subclasses if needed
@@ -26,7 +26,7 @@ class Config:
     MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER')
     
     # Frontend URL for email verification
-    FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+    FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://makeja-csu3.vercel.app')
     
     # M-Pesa payment settings (Sandbox - for testing only)
     MPESA_CONSUMER_KEY = 'Bl0yLyomUFlqQJv36ou12oxNLDVpRE38iPUYZ5dXZbGruDel'
