@@ -24,7 +24,7 @@ def create_app(config_name=None):
     app.config.from_object(config[config_name])
     
     # Enable CORS
-    CORS(app)
+    CORS(app, origins=['https://makeja-csu3.vercel.app'], supports_credentials=True )
   
     # Initialize extensions
     init_db(app)
@@ -178,7 +178,7 @@ M-Pesa Routes: /api/payments/mpesa/*
         print(f"Server error: {str(e)}")
 
 if __name__ == '__main__':
-    
+
    
     app = create_app()
     app.run(debug=True, host='0.0.0.0', port=5000)
