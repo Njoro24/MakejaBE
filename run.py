@@ -5,7 +5,7 @@ from flask_jwt_extended import JWTManager
 from flask_mail import Mail
 from app.routes.admin import admin_bp
 import app.models
-from app.models import *
+
 
 # Import configuration and database
 from app.config import config
@@ -182,4 +182,4 @@ if __name__ == '__main__':
 
    
     app = create_app()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=10000)
