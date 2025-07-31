@@ -2,20 +2,18 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-from dotenv import load_dotenv
-
-load_dotenv()
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key'
-
-   
     
     # Basic Flask settings
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key'
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'jwt-secret-key'
     
-   # Database - PostgreSQL for production, overridden in subclasses if needed
+    # CORS settings
+    ALLOWED_ORIGINS = ['http://localhost:5173']
+    CORS_SUPPORTS_CREDENTIALS = True
+    
+    # Database - PostgreSQL for production, overridden in subclasses if needed
     SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'postgresql://makeja_user:makeja_pass@localhost/makeja_db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
@@ -63,6 +61,5 @@ config = {
     'testing': TestingConfig,
     'default': DevelopmentConfig
 }
-
 
 SKIP_EMAIL_VERIFICATION = os.getenv('SKIP_EMAIL_VERIFICATION', 'False').lower() == 'true'
