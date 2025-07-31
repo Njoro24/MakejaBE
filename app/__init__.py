@@ -24,16 +24,28 @@ def create_app(config_name=None):
     )
 
     # Initialize extensions
-    init_db(app)
-    jwt = JWTManager(app)
+    try:
+        init_db(app)
+        jwt = JWTManager(app)
+        print("Extensions initialized successfully")
+    except Exception as e:
+        print(f"Extensions error: {e}")
     
     # Initialize middleware
-    init_rate_limiter(app)
-    register_error_handlers(app)
+    try:
+        init_rate_limiter(app)
+        register_error_handlers(app)
+        print("Middleware initialized successfully")
+    except Exception as e:
+        print(f"Middleware error: {e}")
     
     # Register blueprints
-    from .routes.auth import auth_bp
-    app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    try:
+        from .routes.auth import auth_bp
+        app.register_blueprint(auth_bp, url_prefix='/api/auth')
+        print("Auth blueprint registered successfully")
+    except Exception as e:
+        print(f"Auth blueprint error: {e}")
     
     # Health check endpoint
     @app.route('/api/health')
