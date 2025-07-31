@@ -1,35 +1,54 @@
 from flask import Flask
+from flask_cors import CORS
+from flask_jwt_extended import JWTManager
 from .config import Config
-from .middleware.cors_middleware import init_cors
+from .db import init_db
 from .middleware.error_handler import register_error_handlers
 from .middleware.rate_limiting import init_rate_limiter
-from .db import init_db
-from flask_jwt_extended import JWTManager
-from flask_cors import CORS
 
 def create_app(config_name=None):
+    """Create and configure Flask app"""
     app = Flask(__name__)
-    app.config.from_object(Config)
-
-    #Enable CORS for your Vercel domain
+    
+    try:
+        app.config.from_object(Config)
+    except Exception as e:
+        print(f"Config error: {e}")
+    
+    # Configure CORS
     CORS(
         app,
         origins=["https://makeja-csu3.vercel.app"],
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization"]
+        allow_headers=["Content-Type", "Authorization"],
+        supports_credentials=True
     )
 
-    #Initialize other middleware
-    init_cors(app)  # Only keep this if it does NOT override Flask-CORS
-    init_rate_limiter(app)
-    register_error_handlers(app)
+    try:
+        init_db(app)
+        jwt = JWTManager(app)
+    except Exception as e:
+        print(f"Extensions error: {e}")
     
-    # ✅ Initialize database & JWT
-    init_db(app)
-    jwt = JWTManager(app)
+    try:
+        init_rate_limiter(app)
+        register_error_handlers(app)
+    except Exception as e:
+        print(f"Middleware error: {e}")
     
-    #Register auth blueprint
-    from .routes.auth import auth_bp
-    app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    try:
+        from .routes.auth import auth_bp
+        app.register_blueprint(auth_bp, url_prefix='/api/auth')
+        print("Auth blueprint registered successfully")
+    except Exception as e:
+        print(f"Blueprint error: {e}")
+    
+    @app.route('/api/health')
+    def health_check():
+        return {'status': 'healthy'}, 200
+    
+    @app.route('/')
+    def home():
+        return {'message': 'Flask app is running'}, 200
     
     return app
