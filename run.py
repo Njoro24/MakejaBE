@@ -3,9 +3,7 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_mail import Mail
-from app.routes.admin import admin_bp
 import app.models
-
 
 # Import configuration and database
 from app.config import config
@@ -37,77 +35,54 @@ def create_app(config_name=None):
     # Setup JWT
     jwt = JWTManager(app)
 
-    # Import routes (only import what exists)
-    try:
-        from app.routes.auth import auth_bp
-    except ImportError:
-        auth_bp = None
-        print("auth.py not found or has import errors")
+    # Import and register blueprints - Remove try-except to see actual errors
+    print("Importing auth blueprint...")
+    from app.routes.auth import auth_bp
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    print("Auth routes registered at /api/auth")
 
+    # Import other routes with error handling
     try:
         from app.routes.user import user_bp
-    except ImportError:
-        user_bp = None
-        print("user.py route not found")
+        app.register_blueprint(user_bp, url_prefix='/api/users')
+        print("User routes registered")
+    except ImportError as e:
+        print(f"User routes not found: {e}")
 
     try:
         from app.routes.hostel import hostel_bp
-    except ImportError:
-        hostel_bp = None
-        print("hostel.py route not found")
+        app.register_blueprint(hostel_bp, url_prefix='/api/hostels')
+        print("Hostel routes registered")
+    except ImportError as e:
+        print(f"Hostel routes not found: {e}")
 
     try:
         from app.routes.booking import booking_bp
-    except ImportError:
-        booking_bp = None
-        print("booking.py route not found")
+        app.register_blueprint(booking_bp, url_prefix='/api/bookings')
+        print("Booking routes registered")
+    except ImportError as e:
+        print(f"Booking routes not found: {e}")
 
     try:
         from app.routes.payment import payment_bp
-    except ImportError:
-        payment_bp = None
-        print("payment.py route not found")
+        app.register_blueprint(payment_bp, url_prefix='/api/payments')
+        print("Payment routes registered")
+    except ImportError as e:
+        print(f"Payment routes not found: {e}")
 
     try:
         from app.routes.review import review_bp
-    except ImportError:
-        review_bp = None
-        print("review.py route not found")
+        app.register_blueprint(review_bp, url_prefix='/api/reviews')
+        print("Review routes registered")
+    except ImportError as e:
+        print(f"Review routes not found: {e}")
 
     try:
         from app.routes.admin import admin_bp
-    except ImportError:
-        admin_bp = None
-        print("admin.py route not found")
-    
-    # Register blueprints (only register what exists)
-    if auth_bp:
-        app.register_blueprint(auth_bp, url_prefix='/api/auth')
-        print("Auth routes registered")
-    
-    if user_bp:
-        app.register_blueprint(user_bp, url_prefix='/api/users')
-        print("User routes registered")
-    
-    if hostel_bp:
-        app.register_blueprint(hostel_bp, url_prefix='/api/hostels')
-        print("Hostel routes registered")
-    
-    if booking_bp:
-        app.register_blueprint(booking_bp, url_prefix='/api/bookings')
-        print("Booking routes registered")
-    
-    if payment_bp:
-        app.register_blueprint(payment_bp, url_prefix='/api/payments')
-        print("Payment routes registered (includes M-Pesa)")
-    
-    if review_bp:
-        app.register_blueprint(review_bp, url_prefix='/api/reviews')
-        print("Review routes registered")
-    
-    if admin_bp:
         app.register_blueprint(admin_bp, url_prefix='/api/admin')
         print("Admin routes registered")
+    except ImportError as e:
+        print(f"Admin routes not found: {e}")
     
     # Health check endpoint
     @app.route('/api/health')
@@ -126,7 +101,7 @@ def create_app(config_name=None):
                 'users': '/api/users',
                 'hostels': '/api/hostels',
                 'bookings': '/api/bookings',
-                'payments': '/api/payments (includes M-Pesa)',
+                'payments': '/api/payments',
                 'reviews': '/api/reviews',
                 'admin': '/api/admin',
                 'health': '/api/health'
@@ -152,17 +127,16 @@ def main():
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('DEBUG', 'True').lower() == 'true'
     
-    
     app = create_app(config_name)
     
     print(f"""
- MAKEJA BACKEND
+MAKEJA BACKEND STARTING
 Environment: {config_name.upper()}
 Host: {host}
 Port: {port}
 Debug: {debug}
 URL: http://{host}:{port}/
-M-Pesa Routes: /api/payments/mpesa/*
+Auth API: http://{host}:{port}/api/auth/register
     """)
     
     # Run the application
@@ -179,7 +153,5 @@ M-Pesa Routes: /api/payments/mpesa/*
         print(f"Server error: {str(e)}")
 
 if __name__ == '__main__':
-
-   
     app = create_app()
     app.run(debug=True, host='0.0.0.0', port=10000)
