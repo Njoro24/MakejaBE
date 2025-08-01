@@ -16,5 +16,5 @@ class Booking(db.Model):
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     updated_at = db.Column(db.DateTime, onupdate=db.func.now())
 
-    user = db.relationship('User', back_populates='bookings')
-    room = db.relationship('Room', back_populates='bookings')
+    #user = db.relationship('User', back_populates='bookings')
+    #room = db.relationship('Room', back_populates='bookings')
