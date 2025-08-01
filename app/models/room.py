@@ -9,6 +9,6 @@ class Room(db.Model):
     price_per_night = db.Column(db.Float, nullable=False)
 
     host_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    host = db.relationship('User', back_populates='rooms')
+    host = db.relationship('User')
 
     bookings = db.relationship('Booking', back_populates='room', lazy=True)
