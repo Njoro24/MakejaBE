@@ -21,9 +21,9 @@ class Config:
     MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
     MAIL_PORT = int(os.environ.get('MAIL_PORT', 587))
     MAIL_USE_TLS = True
-    MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
-    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
-    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER')
+    MAIL_USERNAME = os.environ.get('meshacknjrg@gmail.com')
+    MAIL_PASSWORD = os.environ.get('vbyonopfekjnrdws')
+    MAIL_DEFAULT_SENDER = os.environ.get('meshacknjrg@gmail.com')
     
     # Frontend URL for email verification
     FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://makeja-csu3.vercel.app')
