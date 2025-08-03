@@ -38,9 +38,8 @@ flask-migrate = "*"
 mpesa-api = "*"
 sqlalchemy = "*"
 pyjwt = "*"
-flask-jwt-extended = "*"
-marshmallow = "*"
 pytest = "*"
+flask-jwt-extended = "*"
 
 [dev-packages]
 
