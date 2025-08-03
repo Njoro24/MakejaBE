@@ -3,6 +3,8 @@ from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from app.services.auth_service import AuthService
 from app.models.user import TokenBlacklist
 from datetime import datetime
+from flask_cors import cross_origin
+
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -304,3 +306,27 @@ def test():
         'service': 'AuthService integration active',
         'timestamp': datetime.utcnow().isoformat()
     }), 200
+
+@auth_bp.route('/verify', methods=['GET', 'OPTIONS'])
+@cross_origin(origins="http://127.0.0.1:5173", supports_credentials=True)
+@jwt_required()
+def verify_token():
+    """Verify if token is valid and return user info"""
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        current_user_id = get_jwt_identity()
+        user = AuthService.get_user_by_id(current_user_id)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        return jsonify({
+            'message': 'Token is valid',
+            'user': user.serialize()
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f"Token verification error: {str(e)}")
+        return jsonify({'error': 'Token verification failed'}), 401

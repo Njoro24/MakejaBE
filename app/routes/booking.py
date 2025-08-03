@@ -1,61 +1,57 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from app.models import db
 from app.models.booking import Booking
-from app.schemas.booking_schema import BookingSchema
-from app.db import db
-from marshmallow import ValidationError
-from datetime import datetime
+from app.models.user import User
+from app.models.room import Room
 
-booking_bp = Blueprint('booking_bp', __name__)
-booking_schema = BookingSchema()
-bookings_schema = BookingSchema(many=True)
+booking_bp = Blueprint("booking", __name__, url_prefix="/api/bookings")
 
-# GET /bookings - return current user's bookings
-@booking_bp.route('/bookings', methods=['GET'])
-@jwt_required()
-def get_user_bookings():
-    current_user = get_jwt_identity()
-    user_bookings = Booking.query.filter_by(user_id=current_user['id']).all()
-    return bookings_schema.jsonify(user_bookings), 200
-
-# POST /bookings - create a new booking
-@booking_bp.route('/bookings', methods=['POST'])
+@booking_bp.route("/", methods=["POST"])
 @jwt_required()
 def create_booking():
+    user_id = get_jwt_identity()
+    print("JWT Identity (User ID):", user_id)  # Debug print
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    if user.role != "user":
+        return jsonify({"error": "Only users can create bookings"}), 403
+
     data = request.get_json()
-    current_user = get_jwt_identity()
+    room_id = data.get("room_id")
+    start_date = data.get("start_date")
+    end_date = data.get("end_date")
 
-    try:
-        validated = booking_schema.load(data)
-    except ValidationError as err:
-        return jsonify(err.messages), 400
+    if not room_id or not start_date or not end_date:
+        return jsonify({"error": "Missing required fields"}), 400
 
-    room_id = validated['room_id']
-    check_in = validated['check_in']
-    check_out = validated['check_out']
-    total_price = validated['total_price']
+    room = Room.query.get(room_id)
+    if not room:
+        return jsonify({"error": "Room not found"}), 404
 
-    # Check for booking conflicts
-    overlap = Booking.query.filter(
-        Booking.room_id == room_id,
-        Booking.status == 'approved',
-        Booking.check_in < check_out,
-        Booking.check_out > check_in
-    ).first()
-
-    if overlap:
-        return jsonify({'error': 'Room is already booked for the selected dates'}), 409
+    if room.host_id == user_id:
+        return jsonify({"error": "You cannot book your own room"}), 403
 
     new_booking = Booking(
-        user_id=current_user['id'],
+        user_id=user_id,
         room_id=room_id,
-        check_in=check_in,
-        check_out=check_out,
-        total_price=total_price,
-        status='pending'  
+        start_date=start_date,
+        end_date=end_date
     )
 
     db.session.add(new_booking)
     db.session.commit()
 
-    return booking_schema.jsonify(new_booking), 201
+    return jsonify({
+        "message": "Booking created successfully",
+        "booking": {
+            "id": new_booking.id,
+            "room_id": new_booking.room_id,
+            "user_id": new_booking.user_id,
+            "start_date": new_booking.start_date.isoformat(),
+            "end_date": new_booking.end_date.isoformat()
+        }
+    }), 201

@@ -24,7 +24,8 @@ def create_app(config_name=None):
     app.config.from_object(config[config_name])
     
     # Enable CORS
-    CORS(app)
+    CORS(app, resources={r"/api/*": {"origins": "http://127.0.0.1:5173"}}, supports_credentials=True)
+
   
     # Initialize extensions
     init_db(app)
@@ -49,11 +50,13 @@ def create_app(config_name=None):
         user_bp = None
         print("user.py route not found")
 
-    try:
-        from app.routes.hostel import hostel_bp
-    except ImportError:
-        hostel_bp = None
-        print("hostel.py route not found")
+    # COMMENTED: Not yet implemented
+    # try:
+    #     from app.routes.hostel import hostel_bp
+    # except ImportError:
+    #     hostel_bp = None
+    #     print("hostel.py route not found")
+    hostel_bp = None
 
     try:
         from app.routes.booking import booking_bp
@@ -61,11 +64,13 @@ def create_app(config_name=None):
         booking_bp = None
         print("booking.py route not found")
 
-    try:
-        from app.routes.payment import payment_bp
-    except ImportError:
-        payment_bp = None
-        print("payment.py route not found")
+    # COMMENTED: Not yet implemented
+    # try:
+    #     from app.routes.payment import payment_bp
+    # except ImportError:
+    #     payment_bp = None
+    #     print("payment.py route not found")
+    payment_bp = None
 
     try:
         from app.routes.review import review_bp
@@ -89,16 +94,20 @@ def create_app(config_name=None):
         print("User routes registered")
     
     if hostel_bp:
-        app.register_blueprint(hostel_bp, url_prefix='/api/hostels')
-        print("Hostel routes registered")
+        # COMMENTED OUT REGISTRATION
+        # app.register_blueprint(hostel_bp, url_prefix='/api/hostels')
+        # print("Hostel routes registered")
+        print("Hostel routes skipped (not implemented)")
     
     if booking_bp:
         app.register_blueprint(booking_bp, url_prefix='/api/bookings')
         print("Booking routes registered")
     
     if payment_bp:
-        app.register_blueprint(payment_bp, url_prefix='/api/payments')
-        print("Payment routes registered (includes M-Pesa)")
+        # COMMENTED OUT REGISTRATION
+        # app.register_blueprint(payment_bp, url_prefix='/api/payments')
+        # print("Payment routes registered (includes M-Pesa)")
+        print("Payment routes skipped (not implemented)")
     
     if review_bp:
         app.register_blueprint(review_bp, url_prefix='/api/reviews')
@@ -123,9 +132,9 @@ def create_app(config_name=None):
             'endpoints': {
                 'auth': '/api/auth',
                 'users': '/api/users',
-                'hostels': '/api/hostels',
+                # 'hostels': '/api/hostels',
+                # 'payments': '/api/payments (includes M-Pesa)',
                 'bookings': '/api/bookings',
-                'payments': '/api/payments (includes M-Pesa)',
                 'reviews': '/api/reviews',
                 'admin': '/api/admin',
                 'health': '/api/health'
@@ -150,7 +159,6 @@ def main():
     host = os.environ.get('HOST', '127.0.0.1')
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('DEBUG', 'True').lower() == 'true'
-    
     
     app = create_app(config_name)
     
@@ -178,6 +186,5 @@ M-Pesa Routes: /api/payments/mpesa/*
         print(f"Server error: {str(e)}")
 
 if __name__ == '__main__':
-   
     app = create_app()
     app.run(debug=True, host='0.0.0.0', port=5000)

@@ -12,3 +12,8 @@ class RoomSchema(SQLAlchemyAutoSchema):
         exclude = ['bookings']  # prevent infinite nesting
 
     host = fields.Nested(UserSchema)
+
+
+# ✅ Add these instances at the bottom
+room_schema = RoomSchema()
+rooms_schema = RoomSchema(many=True)
