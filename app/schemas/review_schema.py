@@ -2,7 +2,7 @@ from marshmallow import Schema, fields, validate
 
 class ReviewSchema(Schema):
     id = fields.Int(dump_only=True)
-    user_id = fields.Int(required=True)
+    user_id = fields.Int(dump_only=True)
     hostel_id = fields.Int(required=True)
     rating = fields.Int(
         required=True,

@@ -80,28 +80,7 @@ def login():
         print(f"Auth error: {str(e)}")
         return jsonify({'error': str(e)}), 401
 
-@auth_bp.route('/verify', methods=['GET'])
-@jwt_required()
-def verify_token():
-    """Verify JWT token"""
-    try:
-        current_user_id = get_jwt_identity()
-        user = AuthService.get_user_by_id(current_user_id)
-        
-        if not user:
-            return jsonify({'error': 'User not found'}), 404
-        
-        if not user.is_active:
-            return jsonify({'error': 'Account is deactivated'}), 401
-        
-        return jsonify({
-            'valid': True,
-            'user': user.serialize()
-        }), 200
-        
-    except Exception as e:
-        current_app.logger.error(f"Token verification error: {str(e)}")
-        return jsonify({'error': 'Token verification failed'}), 401
+
 
 @auth_bp.route('/verify-email', methods=['GET'])
 def verify_email():
